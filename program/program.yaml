@@ -1,0 +1,290 @@
+# Willpower Instinct — 10-Week Program Content
+# Weeks 1-3: fully authored | Weeks 4-10: stubbed
+# Edit this file freely; restart the bot to apply changes.
+
+weeks:
+  - week_number: 1
+    title: "I Will, I Won't, I Want"
+    theme: >
+      The three powers of willpower. This week you name your challenge, observe
+      your relationship with it, and discover what your brain and body are
+      actually doing — without trying to change anything yet.
+    microscope:
+      text: >
+        Track your willpower choices all week. Every time you face your
+        challenge — the urge, the moment of decision, what you did — simply
+        notice and note it. Don't try to change anything. You're a scientist
+        observing yourself in the field.
+      daily_prompt: "What did you notice about your challenge today? Any surprises about when or why the urge showed up?"
+    experiment:
+      text: >
+        Write down your three powers each morning and review them tonight:
+        I WILL (your positive habit), I WON'T (what you're avoiding),
+        I WANT (the long-term goal that makes both worth it). Keep them
+        somewhere visible — phone lock screen, sticky note, journal.
+      daily_prompt: "Did naming your three powers shift how you showed up today? Even slightly?"
+    daily_prompts:
+      - "What did you notice about your challenge today? Any patterns?"
+      - "When did you feel most in control? What was different about that moment?"
+      - "What were you thinking or feeling right before a willpower moment?"
+      - "Did reviewing your I Will / I Won't / I Want this morning change how you approached the day?"
+      - "What surprised you most about your own behavior this week?"
+      - "What triggered the strongest urge today? How did you respond?"
+      - "If you could give yourself one piece of advice about your challenge, what would it be?"
+    structured_questions:
+      - id: energy_level
+        label: "Energy level today"
+        type: scale_1_5
+      - id: challenge_adherence
+        label: "Did you honor your challenge today?"
+        type: yes_no_partial
+      - id: urge_count
+        label: "How many urges did you notice?"
+        type: count_0_10
+
+  - week_number: 2
+    title: "The Willpower Instinct"
+    theme: >
+      Willpower is a biological state, not a character trait. Heart rate
+      variability (HRV) is your body's measure of self-control reserve.
+      The pause-and-plan response — the opposite of fight-or-flight — is
+      what makes self-control possible. You can train it with your breath.
+    microscope:
+      text: >
+        Notice the physical state of your body when you face your challenge.
+        What does temptation feel like? What does self-control feel like?
+        Are you energised or depleted? Calm or anxious? Treat your body as
+        a data source this week, not an obstacle.
+      daily_prompt: "What did you notice in your body when you faced your challenge today? Tense, tired, calm, agitated?"
+    experiment:
+      text: >
+        Practice slow breathing once a day: inhale for 4 counts, exhale for
+        6 counts. Aim for 4–6 breaths per minute, 5 minutes total. Do it
+        before a predictable willpower moment if possible (morning coffee,
+        before lunch, right before your usual slip time). Notice whether
+        it changes your sense of control.
+      daily_prompt: "Did you do the slow breathing today? What, if anything, did you notice afterward?"
+    daily_prompts:
+      - "What did your body feel like when temptation hit today?"
+      - "Did you practice slow breathing? When did you do it?"
+      - "On a scale of 1–5, how in-control did you feel at your most challenged moment today?"
+      - "Was there a moment today when you paused before acting? What happened?"
+      - "What physical cues signal that your self-control is running low?"
+      - "Did the breathing practice feel different today than yesterday?"
+      - "How would you describe your HRV state today — depleted or replenished?"
+    structured_questions:
+      - id: energy_level
+        label: "Energy level today"
+        type: scale_1_5
+      - id: challenge_adherence
+        label: "Did you honor your challenge today?"
+        type: yes_no_partial
+      - id: urge_count
+        label: "How many urges did you notice?"
+        type: count_0_10
+      - id: breathing_done
+        label: "Did you do the slow breathing exercise?"
+        type: yes_no
+
+  - week_number: 3
+    title: "Too Tired to Resist"
+    theme: >
+      Willpower is like a muscle — it fatigues with use and recovers with
+      rest. The biggest threats to your reserve are sleep deprivation,
+      chronic stress, and poor recovery. The biggest wins come from sleep,
+      exercise, and strategic rest — not from trying harder.
+    microscope:
+      text: >
+        Track the connection between sleep, energy, and willpower. Each
+        morning, note how you slept. Each evening, rate how your willpower
+        held up. Look for the pattern over the week — your data will be
+        more convincing than the theory.
+      daily_prompt: "How did last night's sleep affect your willpower today? Rate the connection."
+    experiment:
+      text: >
+        Choose one physical recovery booster this week and protect it:
+        (a) Sleep 30 more minutes than usual — guard the bedtime ruthlessly,
+        (b) Add a 10-minute walk at your lowest willpower point of the day, or
+        (c) Take a 5-minute "physiological sigh" break when depleted (two
+        inhales through the nose, one long exhale). Track it daily.
+      daily_prompt: "Did you do your recovery experiment today? What effect did you notice on your willpower reserve?"
+    daily_prompts:
+      - "How rested did you wake up feeling? Did it show in your self-control today?"
+      - "What time did you go to bed last night? Did that feel like enough?"
+      - "At what point in the day did your willpower feel lowest?"
+      - "Did you do your recovery experiment (sleep/walk/sigh break) today?"
+      - "What drained your willpower most today — decisions, emotions, or physical tiredness?"
+      - "What would it look like to protect your willpower reserve tomorrow?"
+      - "Looking at the whole week: what's the clearest pattern between recovery and self-control?"
+    structured_questions:
+      - id: energy_level
+        label: "Energy level today"
+        type: scale_1_5
+      - id: challenge_adherence
+        label: "Did you honor your challenge today?"
+        type: yes_no_partial
+      - id: urge_count
+        label: "How many urges did you notice?"
+        type: count_0_10
+      - id: sleep_hours
+        label: "Hours of sleep last night"
+        type: sleep_hours
+      - id: exercise_done
+        label: "Did you exercise or do your recovery experiment?"
+        type: yes_no
+
+  # ── Weeks 4-10: stubbed. Fill in before starting that phase. ──────────────
+
+  - week_number: 4
+    title: "License to Sin"
+    theme: "Moral licensing: how doing good gives us permission to be bad. STUB."
+    microscope:
+      text: "STUB — fill in before Week 4."
+      daily_prompt: "STUB"
+    experiment:
+      text: "STUB — fill in before Week 4."
+      daily_prompt: "STUB"
+    daily_prompts:
+      - "STUB"
+    structured_questions:
+      - id: energy_level
+        label: "Energy level today"
+        type: scale_1_5
+      - id: challenge_adherence
+        label: "Did you honor your challenge today?"
+        type: yes_no_partial
+      - id: urge_count
+        label: "How many urges did you notice?"
+        type: count_0_10
+
+  - week_number: 5
+    title: "The Brain's Big Lie"
+    theme: "Dopamine, wanting vs. liking, and the promise of reward. STUB."
+    microscope:
+      text: "STUB — fill in before Week 5."
+      daily_prompt: "STUB"
+    experiment:
+      text: "STUB — fill in before Week 5."
+      daily_prompt: "STUB"
+    daily_prompts:
+      - "STUB"
+    structured_questions:
+      - id: energy_level
+        label: "Energy level today"
+        type: scale_1_5
+      - id: challenge_adherence
+        label: "Did you honor your challenge today?"
+        type: yes_no_partial
+      - id: urge_count
+        label: "How many urges did you notice?"
+        type: count_0_10
+
+  - week_number: 6
+    title: "What the Hell"
+    theme: "Stress, guilt, the what-the-hell effect, and self-forgiveness. STUB."
+    microscope:
+      text: "STUB — fill in before Week 6."
+      daily_prompt: "STUB"
+    experiment:
+      text: "STUB — fill in before Week 6."
+      daily_prompt: "STUB"
+    daily_prompts:
+      - "STUB"
+    structured_questions:
+      - id: energy_level
+        label: "Energy level today"
+        type: scale_1_5
+      - id: challenge_adherence
+        label: "Did you honor your challenge today?"
+        type: yes_no_partial
+      - id: urge_count
+        label: "How many urges did you notice?"
+        type: count_0_10
+
+  - week_number: 7
+    title: "Putting the Future on Sale"
+    theme: "Delay discounting, future self, and precommitment strategies. STUB."
+    microscope:
+      text: "STUB — fill in before Week 7."
+      daily_prompt: "STUB"
+    experiment:
+      text: "STUB — fill in before Week 7."
+      daily_prompt: "STUB"
+    daily_prompts:
+      - "STUB"
+    structured_questions:
+      - id: energy_level
+        label: "Energy level today"
+        type: scale_1_5
+      - id: challenge_adherence
+        label: "Did you honor your challenge today?"
+        type: yes_no_partial
+      - id: urge_count
+        label: "How many urges did you notice?"
+        type: count_0_10
+
+  - week_number: 8
+    title: "Infected!"
+    theme: "Social contagion of willpower and goals — who you spend time with matters. STUB."
+    microscope:
+      text: "STUB — fill in before Week 8."
+      daily_prompt: "STUB"
+    experiment:
+      text: "STUB — fill in before Week 8."
+      daily_prompt: "STUB"
+    daily_prompts:
+      - "STUB"
+    structured_questions:
+      - id: energy_level
+        label: "Energy level today"
+        type: scale_1_5
+      - id: challenge_adherence
+        label: "Did you honor your challenge today?"
+        type: yes_no_partial
+      - id: urge_count
+        label: "How many urges did you notice?"
+        type: count_0_10
+
+  - week_number: 9
+    title: "Don't Read This Chapter"
+    theme: "Ironic rebound, thought suppression, and urge surfing. STUB."
+    microscope:
+      text: "STUB — fill in before Week 9."
+      daily_prompt: "STUB"
+    experiment:
+      text: "STUB — fill in before Week 9."
+      daily_prompt: "STUB"
+    daily_prompts:
+      - "STUB"
+    structured_questions:
+      - id: energy_level
+        label: "Energy level today"
+        type: scale_1_5
+      - id: challenge_adherence
+        label: "Did you honor your challenge today?"
+        type: yes_no_partial
+      - id: urge_count
+        label: "How many urges did you notice?"
+        type: count_0_10
+
+  - week_number: 10
+    title: "Final Thoughts"
+    theme: "Integration: what worked, what didn't, where you go from here. STUB."
+    microscope:
+      text: "STUB — fill in before Week 10."
+      daily_prompt: "STUB"
+    experiment:
+      text: "STUB — fill in before Week 10."
+      daily_prompt: "STUB"
+    daily_prompts:
+      - "STUB"
+    structured_questions:
+      - id: energy_level
+        label: "Energy level today"
+        type: scale_1_5
+      - id: challenge_adherence
+        label: "Did you honor your challenge today?"
+        type: yes_no_partial
+      - id: urge_count
+        label: "How many urges did you notice?"
+        type: count_0_10
