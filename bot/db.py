@@ -54,6 +54,16 @@ CREATE TABLE IF NOT EXISTS boosters (
     UNIQUE(cycle_id, date)
 );
 
+CREATE TABLE IF NOT EXISTS challenges (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id        INTEGER NOT NULL,
+    cycle_id       INTEGER NOT NULL,
+    challenge_type TEXT    NOT NULL,   -- i_will | i_wont | i_want
+    challenge_text TEXT    NOT NULL,
+    sort_order     INTEGER DEFAULT 0,
+    created_at     TEXT    DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS weekly_syntheses (
     id                   INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id              INTEGER NOT NULL,
@@ -253,6 +263,50 @@ async def save_synthesis(user_id: int, cycle_id: int, week_number: int,
             "input_summary=excluded.input_summary",
             (user_id, cycle_id, week_number, datetime.now().isoformat(),
              response_text, input_summary),
+        )
+        await db.commit()
+
+
+# ── challenges ────────────────────────────────────────────────────────────────
+
+async def get_challenges(cycle_id: int) -> list[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM challenges WHERE cycle_id=? ORDER BY sort_order, id",
+            (cycle_id,),
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def add_challenge(user_id: int, cycle_id: int, challenge_type: str,
+                        challenge_text: str, sort_order: int = 0) -> int:
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute(
+            "INSERT INTO challenges (user_id, cycle_id, challenge_type, challenge_text, sort_order) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (user_id, cycle_id, challenge_type, challenge_text, sort_order),
+        )
+        await db.commit()
+        return cur.lastrowid
+
+
+async def update_challenge(challenge_id: int, user_id: int,
+                           challenge_type: str, challenge_text: str) -> None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE challenges SET challenge_type=?, challenge_text=? "
+            "WHERE id=? AND user_id=?",
+            (challenge_type, challenge_text, challenge_id, user_id),
+        )
+        await db.commit()
+
+
+async def delete_challenge(challenge_id: int, user_id: int) -> None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "DELETE FROM challenges WHERE id=? AND user_id=?",
+            (challenge_id, user_id),
         )
         await db.commit()
 
