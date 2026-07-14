@@ -647,6 +647,89 @@ async def _save_checkin(update: Update, context: ContextTypes.DEFAULT_TYPE,
     )
 
 
+# ── /tips ─────────────────────────────────────────────────────────────────────
+
+_TIPS_SYSTEM = (
+    "You are a concise, practical coach for Kelly McGonigal's Willpower Instinct program. "
+    "Give 3–5 concrete, actionable tips tailored to the week's specific theme and experiment. "
+    "Be specific to the chapter content — not generic advice. Under 250 words. "
+    "Format as a short numbered list."
+)
+
+
+async def cmd_tips(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    import asyncio
+    from synthesis import _client
+    from config import SYNTHESIS_MODEL
+
+    user_id = update.effective_user.id
+    cycle = await db.get_active_cycle(user_id)
+    if not cycle:
+        await _no_cycle(update)
+        return
+
+    program = load_program()
+    week_num = cycle["current_week"]
+    week = program.get(week_num, {})
+    if not week or str(week.get("title", "")).startswith("STUB"):
+        await update.message.reply_text(
+            f"Week {week_num} content isn't filled in yet. Edit program.yaml to add it."
+        )
+        return
+
+    await update.message.reply_text("Generating tips… ⏳")
+
+    user_msg = (
+        f"I'm on Week {week_num} of The Willpower Instinct: '{week.get('title', '')}'.\n\n"
+        f"Theme: {week.get('theme', '')}\n\n"
+        f"Under the Microscope: {week.get('microscope', {}).get('text', '')}\n\n"
+        f"This week's experiment: {week.get('experiment', {}).get('text', '')}\n\n"
+        f"My challenge: {cycle['challenge_text']}\n"
+        f"My I Want anchor: {cycle['i_want_anchor']}\n\n"
+        "Give me 3–5 practical tips to get the most out of this week."
+    )
+
+    response = await asyncio.to_thread(
+        _client.messages.create,
+        model=SYNTHESIS_MODEL,
+        max_tokens=400,
+        system=_TIPS_SYSTEM,
+        messages=[{"role": "user", "content": user_msg}],
+    )
+    await update.message.reply_text(
+        f"*Week {week_num} Tips*\n\n{response.content[0].text}",
+        parse_mode=ParseMode.MARKDOWN,
+    )
+
+
+# ── /help ─────────────────────────────────────────────────────────────────────
+
+_HELP_TEXT = """\
+*Willpower Instinct Bot — Commands*
+
+*Setup*
+/start — Begin a new 10-week cycle
+/reset — Archive the current cycle and start fresh
+
+*Daily*
+/log — Log an urge (trigger, intensity, gave in?)
+/today — See today's entry, urges, and boosters
+
+*Weekly*
+/week — This week's theme, microscope exercise & experiment
+/tips — AI-generated tips for the current week
+/history [N] — Show Week N synthesis (default: current week)
+
+*Info*
+/status — Cycle overview (week, day, challenge)
+/help — Show this message
+"""
+
+
+async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await update.message.reply_text(_HELP_TEXT, parse_mode=ParseMode.MARKDOWN)
+
+
 # ── handler registration helper ───────────────────────────────────────────────
 
 def register_handlers(app) -> None:
@@ -691,8 +774,10 @@ def register_handlers(app) -> None:
 
     app.add_handler(CommandHandler("today",   cmd_today))
     app.add_handler(CommandHandler("week",    cmd_week))
+    app.add_handler(CommandHandler("tips",    cmd_tips))
     app.add_handler(CommandHandler("status",  cmd_status))
     app.add_handler(CommandHandler("history", cmd_history))
+    app.add_handler(CommandHandler("help",    cmd_help))
 
     # Evening check-in callbacks
     app.add_handler(CallbackQueryHandler(checkin_energy,    pattern=r"^checkin:energy:"))
