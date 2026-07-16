@@ -32,14 +32,15 @@ CREATE TABLE IF NOT EXISTS daily_entries (
 );
 
 CREATE TABLE IF NOT EXISTS urges (
-    id           INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id      INTEGER NOT NULL,
-    cycle_id     INTEGER NOT NULL,
-    timestamp    TEXT    NOT NULL,
-    trigger_text TEXT,
-    gave_in      INTEGER,     -- 0 | 1
-    intensity    INTEGER,     -- 1-5
-    notes        TEXT
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id       INTEGER NOT NULL,
+    cycle_id      INTEGER NOT NULL,
+    challenge_id  INTEGER,             -- FK to challenges.id, NULL = primary challenge
+    timestamp     TEXT    NOT NULL,
+    trigger_text  TEXT,
+    gave_in       INTEGER,             -- 0 | 1
+    intensity     INTEGER,             -- 1-5
+    notes         TEXT
 );
 
 CREATE TABLE IF NOT EXISTS boosters (
@@ -80,6 +81,13 @@ CREATE TABLE IF NOT EXISTS weekly_syntheses (
 async def init_db() -> None:
     async with aiosqlite.connect(DB_PATH) as db:
         await db.executescript(_DDL)
+        for sql in [
+            "ALTER TABLE urges ADD COLUMN challenge_id INTEGER",
+        ]:
+            try:
+                await db.execute(sql)
+            except Exception:
+                pass  # column already exists
         await db.commit()
 
 
@@ -95,6 +103,16 @@ async def create_cycle(user_id: int, challenge_type: str, challenge_text: str,
         )
         await db.commit()
         return cur.lastrowid
+
+
+async def get_active_cycles(user_id: int) -> list[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM cycles WHERE user_id=? AND status='active' ORDER BY id DESC",
+            (user_id,),
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
 
 
 async def get_active_cycle(user_id: int) -> Optional[dict]:
@@ -165,12 +183,13 @@ async def get_week_entries(cycle_id: int, week_number: int) -> list[dict]:
 
 async def log_urge(user_id: int, cycle_id: int, trigger_text: Optional[str],
                    gave_in: Optional[bool], intensity: Optional[int],
-                   notes: Optional[str] = None) -> int:
+                   notes: Optional[str] = None,
+                   challenge_id: Optional[int] = None) -> int:
     async with aiosqlite.connect(DB_PATH) as db:
         cur = await db.execute(
-            "INSERT INTO urges (user_id, cycle_id, timestamp, trigger_text, gave_in, intensity, notes) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (user_id, cycle_id, datetime.now().isoformat(),
+            "INSERT INTO urges (user_id, cycle_id, challenge_id, timestamp, trigger_text, gave_in, intensity, notes) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (user_id, cycle_id, challenge_id, datetime.now().isoformat(),
              trigger_text, int(gave_in) if gave_in is not None else None,
              intensity, notes),
         )

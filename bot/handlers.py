@@ -4,7 +4,7 @@ All Telegram command and callback handlers.
 Conversation states
 -------------------
 /start onboarding:  CHOOSE_TYPE → ENTER_CHALLENGE → ENTER_WANT → CONFIRM
-/log urge:          LOG_TRIGGER → LOG_GAVE_IN → LOG_INTENSITY → LOG_NOTES
+/log urge:          [LOG_PICK →] LOG_TRIGGER → LOG_GAVE_IN → LOG_INTENSITY → LOG_NOTES
 /reset:             RESET_CONFIRM
 
 Evening check-in (scheduler-driven):
@@ -34,8 +34,8 @@ logger = logging.getLogger(__name__)
 
 # ── conversation state constants ──────────────────────────────────────────────
 CHOOSE_TYPE, ENTER_CHALLENGE, ENTER_WANT, CONFIRM = range(4)
-LOG_TRIGGER, LOG_GAVE_IN, LOG_INTENSITY, LOG_NOTES = range(4, 8)
-RESET_CONFIRM = 8
+LOG_PICK, LOG_TRIGGER, LOG_GAVE_IN, LOG_INTENSITY, LOG_NOTES = range(4, 9)
+RESET_CONFIRM = 9
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -181,7 +181,35 @@ async def cmd_log(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         await _no_cycle(update)
         return ConversationHandler.END
     context.user_data["log_cycle_id"] = cycle["id"]
+
+    challenges = await db.get_challenges(cycle["id"])
+    if not challenges:
+        # No named challenges yet — log against primary
+        await update.message.reply_text(
+            "What triggered this urge? Describe it briefly (or type *skip*).",
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        return LOG_TRIGGER
+
+    # Show each challenge as its own button row
+    buttons = [
+        [(f"{_type_label(c['challenge_type'])}: {c['challenge_text'][:50]}",
+          f"log:pick:{c['id']}")]
+        for c in challenges
+    ]
     await update.message.reply_text(
+        "Which challenge are you logging for?",
+        reply_markup=_kb(buttons),
+    )
+    return LOG_PICK
+
+
+async def log_pick_challenge(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    challenge_id = int(query.data.split(":")[-1])
+    context.user_data["log_challenge_id"] = challenge_id
+    await query.edit_message_text(
         "What triggered this urge? Describe it briefly (or type *skip*).",
         parse_mode=ParseMode.MARKDOWN,
     )
@@ -230,6 +258,7 @@ async def log_notes(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     urge_id = await db.log_urge(
         user_id=user_id,
         cycle_id=cycle_id,
+        challenge_id=context.user_data.get("log_challenge_id"),
         trigger_text=context.user_data.get("log_trigger"),
         gave_in=context.user_data.get("log_gave_in"),
         intensity=context.user_data.get("log_intensity"),
@@ -239,6 +268,7 @@ async def log_notes(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     result = "Logged. " + ("You gave in — that's data, not failure." if gave_in
                            else "You resisted. That's real.")
     context.user_data.pop("log_cycle_id", None)
+    context.user_data.pop("log_challenge_id", None)
     context.user_data.pop("log_trigger", None)
     context.user_data.pop("log_gave_in", None)
     context.user_data.pop("log_intensity", None)
@@ -247,7 +277,7 @@ async def log_notes(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 
 async def log_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    for k in ("log_cycle_id", "log_trigger", "log_gave_in", "log_intensity"):
+    for k in ("log_cycle_id", "log_challenge_id", "log_trigger", "log_gave_in", "log_intensity"):
         context.user_data.pop(k, None)
     await update.message.reply_text("Urge log cancelled.")
     return ConversationHandler.END
@@ -751,6 +781,7 @@ def register_handlers(app) -> None:
     log_conv = ConversationHandler(
         entry_points=[CommandHandler("log", cmd_log)],
         states={
+            LOG_PICK:      [CallbackQueryHandler(log_pick_challenge, pattern=r"^log:pick:")],
             LOG_TRIGGER:   [MessageHandler(filters.TEXT & ~filters.COMMAND, log_trigger)],
             LOG_GAVE_IN:   [CallbackQueryHandler(log_gave_in, pattern=r"^log:gavein:")],
             LOG_INTENSITY: [CallbackQueryHandler(log_intensity,
