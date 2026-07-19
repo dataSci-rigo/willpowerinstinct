@@ -22,29 +22,40 @@ logger = logging.getLogger(__name__)
 
 
 async def post_init(application: Application) -> None:
-    from datetime import datetime
+    from datetime import date, datetime, timedelta
     from zoneinfo import ZoneInfo
 
     await db.init_db()
     logger.info("Database initialised")
 
-    # Catch-up: if the bot restarted after the evening check-in time and
-    # there's no entry saved for today yet, send the check-in now.
+    cycle = await db.get_active_cycle(OWNER_CHAT_ID)
+    if not cycle:
+        return
+
     now_local = datetime.now(ZoneInfo(TIMEZONE))
-    if now_local.hour >= EVENING_HOUR:
-        cycle = await db.get_active_cycle(OWNER_CHAT_ID)
-        if cycle:
-            today = now_local.date().isoformat()
-            entry = await db.get_daily_entry(cycle["id"], today)
-            if not entry or not entry.get("energy_level"):
-                logger.info("Sending catch-up evening check-in for %s", today)
+    today = now_local.date()
 
-                class _FakeContext:
-                    def __init__(self, bot):
-                        self.bot = bot
-                        self.user_data = {}
+    # ── Catch-up: advance week if weekly_kickoff was missed ───────────────────
+    started = date.fromisoformat(cycle["started_at"])
+    days_elapsed = (today - started).days
+    expected_week = min(days_elapsed // 7 + 1, 10)
+    if expected_week > cycle["current_week"]:
+        await db.advance_week(cycle["id"], expected_week)
+        logger.info("Catch-up: advanced cycle %d to week %d", cycle["id"], expected_week)
 
-                await _send_energy_prompt(_FakeContext(application.bot), OWNER_CHAT_ID)
+    # ── Catch-up: evening check-in if missed AND within the same evening ──────
+    # Only send if it's between 9 PM and 11:59 PM — not during daytime restarts.
+    if EVENING_HOUR <= now_local.hour <= 23:
+        entry = await db.get_daily_entry(cycle["id"], today.isoformat())
+        if not entry or not entry.get("energy_level"):
+            logger.info("Catch-up: sending missed evening check-in for %s", today)
+
+            class _FakeContext:
+                def __init__(self, bot):
+                    self.bot = bot
+                    self.user_data = {}
+
+            await _send_energy_prompt(_FakeContext(application.bot), OWNER_CHAT_ID)
 
 
 def main() -> None:
