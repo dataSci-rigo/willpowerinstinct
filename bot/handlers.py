@@ -380,6 +380,45 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     )
 
 
+# ── /setweek ──────────────────────────────────────────────────────────────────
+
+async def cmd_setweek(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = update.effective_user.id
+    cycle = await db.get_active_cycle(user_id)
+    if not cycle:
+        await _no_cycle(update)
+        return
+
+    if not context.args:
+        await update.message.reply_text(
+            "Usage: `/setweek <1–10>`\nExample: `/setweek 2`",
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        return
+
+    try:
+        n = int(context.args[0])
+    except ValueError:
+        await update.message.reply_text("Please give a number between 1 and 10.")
+        return
+
+    if not 1 <= n <= 10:
+        await update.message.reply_text("Week must be between 1 and 10.")
+        return
+
+    old = cycle["current_week"]
+    await db.advance_week(cycle["id"], n)
+
+    program = load_program()
+    week = program.get(n, {})
+    direction = "⏩" if n > old else "⏪"
+    await update.message.reply_text(
+        f"{direction} Moved from Week {old} → *Week {n}: {week.get('title', '')}*\n\n"
+        f"_{week.get('theme', '')}_",
+        parse_mode=ParseMode.MARKDOWN,
+    )
+
+
 # ── /reset ────────────────────────────────────────────────────────────────────
 
 async def cmd_reset(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -740,6 +779,7 @@ _HELP_TEXT = """\
 *Setup*
 /start — Begin a new 10-week cycle
 /reset — Archive the current cycle and start fresh
+/setweek N — Jump to week N (1–10), forward or backward
 
 *Daily*
 /log — Log an urge (trigger, intensity, gave in?)
@@ -808,6 +848,7 @@ def register_handlers(app) -> None:
     app.add_handler(CommandHandler("tips",    cmd_tips))
     app.add_handler(CommandHandler("status",  cmd_status))
     app.add_handler(CommandHandler("history", cmd_history))
+    app.add_handler(CommandHandler("setweek", cmd_setweek))
     app.add_handler(CommandHandler("help",    cmd_help))
 
     # Evening check-in callbacks
