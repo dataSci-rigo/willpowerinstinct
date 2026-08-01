@@ -83,6 +83,11 @@ async def init_db() -> None:
         await db.executescript(_DDL)
         for sql in [
             "ALTER TABLE urges ADD COLUMN challenge_id INTEGER",
+            "ALTER TABLE urges ADD COLUMN outcome TEXT",
+            "ALTER TABLE urges ADD COLUMN skill_week INTEGER",
+            "ALTER TABLE urges ADD COLUMN i_want_recalled INTEGER",
+            "ALTER TABLE urges ADD COLUMN breathing_done INTEGER",
+            "ALTER TABLE urges ADD COLUMN recovery_action TEXT",
         ]:
             try:
                 await db.execute(sql)
@@ -184,14 +189,22 @@ async def get_week_entries(cycle_id: int, week_number: int) -> list[dict]:
 async def log_urge(user_id: int, cycle_id: int, trigger_text: Optional[str],
                    gave_in: Optional[bool], intensity: Optional[int],
                    notes: Optional[str] = None,
-                   challenge_id: Optional[int] = None) -> int:
+                   challenge_id: Optional[int] = None,
+                   outcome: Optional[str] = None,
+                   skill_week: Optional[int] = None,
+                   i_want_recalled: Optional[int] = None,
+                   breathing_done: Optional[int] = None,
+                   recovery_action: Optional[str] = None) -> int:
     async with aiosqlite.connect(DB_PATH) as db:
         cur = await db.execute(
-            "INSERT INTO urges (user_id, cycle_id, challenge_id, timestamp, trigger_text, gave_in, intensity, notes) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO urges "
+            "(user_id, cycle_id, challenge_id, timestamp, trigger_text, gave_in, intensity, notes, "
+            "outcome, skill_week, i_want_recalled, breathing_done, recovery_action) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (user_id, cycle_id, challenge_id, datetime.now().isoformat(),
              trigger_text, int(gave_in) if gave_in is not None else None,
-             intensity, notes),
+             intensity, notes,
+             outcome, skill_week, i_want_recalled, breathing_done, recovery_action),
         )
         await db.commit()
         return cur.lastrowid

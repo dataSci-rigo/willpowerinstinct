@@ -4,7 +4,9 @@ All Telegram command and callback handlers.
 Conversation states
 -------------------
 /start onboarding:  CHOOSE_TYPE → ENTER_CHALLENGE → ENTER_WANT → CONFIRM
-/log urge:          [LOG_PICK →] LOG_TRIGGER → LOG_GAVE_IN → LOG_INTENSITY → LOG_NOTES
+/log urge:          LOG_WEEK → LOG_PICK → LOG_OUTCOME
+                    → [LOG_WEEK1|LOG_WEEK2|LOG_WEEK3] (week-skill question, optional)
+                    → LOG_TRIGGER → LOG_INTENSITY → LOG_NOTES
 /reset:             RESET_CONFIRM
 
 Evening check-in (scheduler-driven):
@@ -34,8 +36,9 @@ logger = logging.getLogger(__name__)
 
 # ── conversation state constants ──────────────────────────────────────────────
 CHOOSE_TYPE, ENTER_CHALLENGE, ENTER_WANT, CONFIRM = range(4)
-LOG_PICK, LOG_TRIGGER, LOG_GAVE_IN, LOG_INTENSITY, LOG_NOTES = range(4, 9)
-RESET_CONFIRM = 9
+LOG_WEEK, LOG_PICK, LOG_OUTCOME, LOG_WEEK1, LOG_WEEK2, LOG_WEEK3, \
+    LOG_TRIGGER, LOG_INTENSITY, LOG_NOTES = range(4, 13)
+RESET_CONFIRM = 13
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -174,6 +177,22 @@ async def start_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
 
 # ── /log — in-the-moment urge capture ────────────────────────────────────────
 
+_LOG_KEYS = (
+    "log_cycle_id", "log_challenge_id", "log_challenge_type",
+    "log_skill_week", "log_outcome", "log_gave_in",
+    "log_i_want_recalled", "log_breathing", "log_recovery",
+    "log_trigger", "log_intensity",
+)
+
+
+def _challenge_buttons(challenges: list) -> list:
+    return [
+        [(f"{_type_label(c['challenge_type'])}: {c['challenge_text'][:50]}",
+          f"log:pick:{c['id']}:{c['challenge_type']}")]
+        for c in challenges
+    ]
+
+
 async def cmd_log(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user_id = update.effective_user.id
     cycle = await db.get_active_cycle(user_id)
@@ -182,24 +201,57 @@ async def cmd_log(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         return ConversationHandler.END
     context.user_data["log_cycle_id"] = cycle["id"]
 
-    challenges = await db.get_challenges(cycle["id"])
+    program = load_program()
+    buttons = [[("Just an urge / temptation", "log:week:0")]]
+    for n in range(1, cycle["current_week"] + 1):
+        title = program.get(n, {}).get("title", f"Week {n}")
+        buttons.append([(f"Week {n}: {title}", f"log:week:{n}")])
+
+    await update.message.reply_text(
+        "Which week's skill are you logging with?",
+        reply_markup=_kb(buttons),
+    )
+    return LOG_WEEK
+
+
+async def log_pick_week(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    n = int(query.data.split(":")[-1])
+    context.user_data["log_skill_week"] = n
+
+    cycle_id = context.user_data["log_cycle_id"]
+    challenges = await db.get_challenges(cycle_id)
+
+    if n == 0:
+        header = "Which challenge are you logging for?"
+    else:
+        program = load_program()
+        week = program.get(n, {})
+        microscope = week.get("microscope", {}).get("text", "").strip()
+        experiment = week.get("experiment", {}).get("text", "").strip()
+        header = (
+            f"*Week {n}: {week.get('title', '')}*\n\n"
+            f"🔬 *Under the Microscope:*\n{microscope}\n\n"
+            f"💡 *This Week's Experiment:*\n{experiment}\n\n"
+            "Which challenge are you logging for?"
+        )
+
     if not challenges:
-        # No named challenges yet — log against primary
-        await update.message.reply_text(
-            "What triggered this urge? Describe it briefly (or type *skip*).",
+        # No named challenges — go straight to outcome with i_wont default
+        context.user_data["log_challenge_type"] = "i_wont"
+        kb = _kb([[("✓ Resisted", "log:outcome:resisted"), ("✗ Gave in", "log:outcome:gave_in")]])
+        await query.edit_message_text(
+            header + "\n\nWhat was the result?",
+            reply_markup=kb,
             parse_mode=ParseMode.MARKDOWN,
         )
-        return LOG_TRIGGER
+        return LOG_OUTCOME
 
-    # Show each challenge as its own button row
-    buttons = [
-        [(f"{_type_label(c['challenge_type'])}: {c['challenge_text'][:50]}",
-          f"log:pick:{c['id']}")]
-        for c in challenges
-    ]
-    await update.message.reply_text(
-        "Which challenge are you logging for?",
-        reply_markup=_kb(buttons),
+    await query.edit_message_text(
+        header,
+        reply_markup=_kb(_challenge_buttons(challenges)),
+        parse_mode=ParseMode.MARKDOWN,
     )
     return LOG_PICK
 
@@ -207,8 +259,99 @@ async def cmd_log(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 async def log_pick_challenge(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
-    challenge_id = int(query.data.split(":")[-1])
+    parts = query.data.split(":")  # log:pick:<id>:<type>
+    challenge_id = int(parts[2])
+    challenge_type = parts[3]
     context.user_data["log_challenge_id"] = challenge_id
+    context.user_data["log_challenge_type"] = challenge_type
+
+    if challenge_type == "i_will":
+        kb = _kb([[
+            ("▶ Started", "log:outcome:started"),
+            ("✅ Completed", "log:outcome:completed"),
+            ("✗ Gave in", "log:outcome:gave_in"),
+        ]])
+    else:
+        kb = _kb([[("✓ Resisted", "log:outcome:resisted"), ("✗ Gave in", "log:outcome:gave_in")]])
+
+    await query.edit_message_text("What was the result?", reply_markup=kb)
+    return LOG_OUTCOME
+
+
+async def log_outcome(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    outcome = query.data.split(":")[-1]
+    context.user_data["log_outcome"] = outcome
+    context.user_data["log_gave_in"] = (outcome == "gave_in")
+
+    skill_week = context.user_data.get("log_skill_week", 0)
+
+    if skill_week == 1:
+        kb = _kb([[("✅ Yes", "log:w1want:1"), ("❌ No", "log:w1want:0")]])
+        await query.edit_message_text(
+            "Did you pause to remember your *I Want* goal?",
+            reply_markup=kb,
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        return LOG_WEEK1
+
+    if skill_week == 2:
+        kb = _kb([[("✅ Yes", "log:w2breath:1"), ("❌ No", "log:w2breath:0")]])
+        await query.edit_message_text(
+            "Did you pause and breathe (slow breathing)?",
+            reply_markup=kb,
+        )
+        return LOG_WEEK2
+
+    if skill_week == 3:
+        kb = _kb([[
+            ("😴 Sleep", "log:w3recovery:sleep"),
+            ("🚶 Exercise", "log:w3recovery:exercise"),
+            ("🧘 Strategic rest", "log:w3recovery:rest"),
+            ("— None", "log:w3recovery:none"),
+        ]])
+        await query.edit_message_text(
+            "Which recovery action did you take?",
+            reply_markup=kb,
+        )
+        return LOG_WEEK3
+
+    # Week 0 or 4-10 (STUB) — skip straight to trigger
+    await query.edit_message_text(
+        "What triggered this urge? Describe it briefly (or type *skip*).",
+        parse_mode=ParseMode.MARKDOWN,
+    )
+    return LOG_TRIGGER
+
+
+async def log_week1(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    context.user_data["log_i_want_recalled"] = int(query.data.split(":")[-1])
+    await query.edit_message_text(
+        "What triggered this urge? Describe it briefly (or type *skip*).",
+        parse_mode=ParseMode.MARKDOWN,
+    )
+    return LOG_TRIGGER
+
+
+async def log_week2(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    context.user_data["log_breathing"] = int(query.data.split(":")[-1])
+    await query.edit_message_text(
+        "What triggered this urge? Describe it briefly (or type *skip*).",
+        parse_mode=ParseMode.MARKDOWN,
+    )
+    return LOG_TRIGGER
+
+
+async def log_week3(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    val = query.data.split(":")[-1]
+    context.user_data["log_recovery"] = None if val == "none" else val
     await query.edit_message_text(
         "What triggered this urge? Describe it briefly (or type *skip*).",
         parse_mode=ParseMode.MARKDOWN,
@@ -220,22 +363,13 @@ async def log_trigger(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     text = update.message.text.strip()
     context.user_data["log_trigger"] = None if text.lower() == "skip" else text
     kb = _kb([
-        [("Yes, I gave in", "log:gavein:1"), ("No, I resisted", "log:gavein:0")],
-    ])
-    await update.message.reply_text("Did you give in?", reply_markup=kb)
-    return LOG_GAVE_IN
-
-
-async def log_gave_in(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    query = update.callback_query
-    await query.answer()
-    context.user_data["log_gave_in"] = query.data.split(":")[-1] == "1"
-    kb = _kb([
         [("1", "log:intensity:1"), ("2", "log:intensity:2"), ("3", "log:intensity:3"),
          ("4", "log:intensity:4"), ("5", "log:intensity:5")],
     ])
-    await query.edit_message_text("Intensity of the urge (1 = mild, 5 = overwhelming)?",
-                                  reply_markup=kb)
+    await update.message.reply_text(
+        "Intensity of the urge (1 = mild, 5 = overwhelming)?",
+        reply_markup=kb,
+    )
     return LOG_INTENSITY
 
 
@@ -254,30 +388,41 @@ async def log_notes(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     text = update.message.text.strip()
     notes = None if text.lower() == "skip" else text
     user_id = update.effective_user.id
-    cycle_id = context.user_data["log_cycle_id"]
-    urge_id = await db.log_urge(
+    outcome = context.user_data.get("log_outcome")
+    gave_in = context.user_data.get("log_gave_in")
+
+    await db.log_urge(
         user_id=user_id,
-        cycle_id=cycle_id,
+        cycle_id=context.user_data["log_cycle_id"],
         challenge_id=context.user_data.get("log_challenge_id"),
         trigger_text=context.user_data.get("log_trigger"),
-        gave_in=context.user_data.get("log_gave_in"),
+        gave_in=gave_in,
         intensity=context.user_data.get("log_intensity"),
         notes=notes,
+        outcome=outcome,
+        skill_week=context.user_data.get("log_skill_week"),
+        i_want_recalled=context.user_data.get("log_i_want_recalled"),
+        breathing_done=context.user_data.get("log_breathing"),
+        recovery_action=context.user_data.get("log_recovery"),
     )
-    gave_in = context.user_data.get("log_gave_in")
-    result = "Logged. " + ("You gave in — that's data, not failure." if gave_in
-                           else "You resisted. That's real.")
-    context.user_data.pop("log_cycle_id", None)
-    context.user_data.pop("log_challenge_id", None)
-    context.user_data.pop("log_trigger", None)
-    context.user_data.pop("log_gave_in", None)
-    context.user_data.pop("log_intensity", None)
+
+    if outcome == "gave_in":
+        result = "Logged. You gave in — that's data, not failure."
+    elif outcome == "completed":
+        result = "Logged. Completed. That's real progress."
+    elif outcome == "started":
+        result = "Logged. You started — that's the hardest part."
+    else:
+        result = "Logged. You resisted. That's real."
+
+    for k in _LOG_KEYS:
+        context.user_data.pop(k, None)
     await update.message.reply_text(result)
     return ConversationHandler.END
 
 
 async def log_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    for k in ("log_cycle_id", "log_challenge_id", "log_trigger", "log_gave_in", "log_intensity"):
+    for k in _LOG_KEYS:
         context.user_data.pop(k, None)
     await update.message.reply_text("Urge log cancelled.")
     return ConversationHandler.END
@@ -821,11 +966,14 @@ def register_handlers(app) -> None:
     log_conv = ConversationHandler(
         entry_points=[CommandHandler("log", cmd_log)],
         states={
+            LOG_WEEK:      [CallbackQueryHandler(log_pick_week,      pattern=r"^log:week:")],
             LOG_PICK:      [CallbackQueryHandler(log_pick_challenge, pattern=r"^log:pick:")],
+            LOG_OUTCOME:   [CallbackQueryHandler(log_outcome,        pattern=r"^log:outcome:")],
+            LOG_WEEK1:     [CallbackQueryHandler(log_week1,          pattern=r"^log:w1want:")],
+            LOG_WEEK2:     [CallbackQueryHandler(log_week2,          pattern=r"^log:w2breath:")],
+            LOG_WEEK3:     [CallbackQueryHandler(log_week3,          pattern=r"^log:w3recovery:")],
             LOG_TRIGGER:   [MessageHandler(filters.TEXT & ~filters.COMMAND, log_trigger)],
-            LOG_GAVE_IN:   [CallbackQueryHandler(log_gave_in, pattern=r"^log:gavein:")],
-            LOG_INTENSITY: [CallbackQueryHandler(log_intensity,
-                                                  pattern=r"^log:intensity:")],
+            LOG_INTENSITY: [CallbackQueryHandler(log_intensity,      pattern=r"^log:intensity:")],
             LOG_NOTES:     [MessageHandler(filters.TEXT & ~filters.COMMAND, log_notes)],
         },
         fallbacks=[CommandHandler("cancel", log_cancel)],
