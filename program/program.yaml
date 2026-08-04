@@ -137,15 +137,35 @@ weeks:
 
   - week_number: 4
     title: "License to Sin"
-    theme: "Moral licensing: how doing good gives us permission to be bad. STUB."
+    theme: >
+      Moral licensing: every good act creates a credit your brain tries to
+      spend on indulgence. Exercising "earns" the dessert; resisting once
+      makes giving in tomorrow feel fair. The very things that make you feel
+      virtuous can become the justification for failing. This week you catch
+      yourself doing the math.
     microscope:
-      text: "STUB — fill in before Week 4."
-      daily_prompt: "STUB"
+      text: >
+        Track moments when past good behavior becomes an excuse for giving in.
+        Notice the logic: "I've been so good about X, I deserve Y." How often
+        does feeling virtuous actually weaken your resolve? You're looking for
+        the credit-and-spend pattern in your own life.
+      daily_prompt: "Did you catch yourself feeling you'd 'earned' a break from your challenge today? What triggered it?"
     experiment:
-      text: "STUB — fill in before Week 4."
-      daily_prompt: "STUB"
+      text: >
+        When you feel you deserve a reward for good behavior, pause and ask:
+        "Would I give this same permission to someone who hadn't been good?"
+        Separate the two decisions — the past good thing and the current
+        choice — and evaluate each on its own merits. Notice whether unlinking
+        them changes what you choose.
+      daily_prompt: "Did you catch the licensing logic before acting on it today? What happened when you separated the two decisions?"
     daily_prompts:
-      - "STUB"
+      - "Did you catch yourself feeling virtuous today — and did that feeling affect your challenge?"
+      - "When did you feel you'd 'earned' something? Was the reward related to your actual goal?"
+      - "Did you give yourself credit for thinking about your challenge even when you didn't act on it?"
+      - "Notice any 'I've been good, so...' moments today. What followed?"
+      - "What felt like progress today? Did that feeling help or hurt your later choices?"
+      - "Did you treat a single good choice as proof you're 'a good person' — and then use that to justify a slip?"
+      - "Looking back at the week: when did feeling virtuous most undermine your actual behavior?"
     structured_questions:
       - id: energy_level
         label: "Energy level today"
@@ -156,18 +176,42 @@ weeks:
       - id: urge_count
         label: "How many urges did you notice?"
         type: count_0_10
+      - id: licensing_caught
+        label: "Did you catch a moral licensing moment today?"
+        type: yes_no
 
   - week_number: 5
     title: "The Brain's Big Lie"
-    theme: "Dopamine, wanting vs. liking, and the promise of reward. STUB."
+    theme: >
+      Dopamine drives wanting, not liking — the anticipation of a reward
+      feels better than the reward itself. Your brain floods with dopamine
+      at the promise of relief, pleasure, or excitement, and that flood feels
+      like certainty that you'll feel better if you give in. The experiment
+      this week: test the promise against reality, and learn to surf the
+      dopamine wave rather than act on it.
     microscope:
-      text: "STUB — fill in before Week 5."
-      daily_prompt: "STUB"
+      text: >
+        When an urge hits, pay attention to what your brain is promising.
+        "If I just have this, I'll feel better." Then — if you do give in —
+        notice what you actually feel. Does reality match the promise?
+        Track the gap between the anticipation and the experience all week.
+      daily_prompt: "When temptation hit today, what did your brain promise you'd feel? Did reality match the promise?"
     experiment:
-      text: "STUB — fill in before Week 5."
-      daily_prompt: "STUB"
+      text: >
+        Practice urge surfing: when a craving arrives, don't act and don't
+        fight — just observe. Set a 10-minute timer. Notice where in your
+        body the urge lives, how strong it is, whether it's rising or fading.
+        Cravings are waves; they peak and pass. The goal isn't to kill the
+        urge but to prove to yourself that you can ride it without wiping out.
+      daily_prompt: "Did you try urge surfing today? What did you notice as you observed the craving without acting on it?"
     daily_prompts:
-      - "STUB"
+      - "What did desire feel like in your body today — before you acted on it?"
+      - "Did you give in to something today? How did it feel vs. how you expected it to feel?"
+      - "What promise did your brain make today about your challenge? Was it accurate?"
+      - "Did you try waiting out an urge? How long did the peak last?"
+      - "What triggers the strongest dopamine hit for your challenge — sight, smell, thought, boredom?"
+      - "Did you notice yourself chasing relief more than actual pleasure today?"
+      - "Looking at the week: how often did the promise of reward match what you actually experienced?"
     structured_questions:
       - id: energy_level
         label: "Energy level today"
@@ -178,18 +222,45 @@ weeks:
       - id: urge_count
         label: "How many urges did you notice?"
         type: count_0_10
+      - id: urge_surfed
+        label: "Did you try urge surfing (observe without acting) today?"
+        type: yes_no
 
   - week_number: 6
     title: "What the Hell"
-    theme: "Stress, guilt, the what-the-hell effect, and self-forgiveness. STUB."
+    theme: >
+      One slip triggers the what-the-hell effect: "I already ruined it —
+      what's the point?" Guilt and self-criticism feel like motivation but
+      actually make relapse more likely. The real recovery tool is
+      self-compassion — not letting yourself off the hook, but treating a
+      slip as information rather than proof of failure. This week you learn
+      the difference between accountability and shame-spiraling.
     microscope:
-      text: "STUB — fill in before Week 6."
-      daily_prompt: "STUB"
+      text: >
+        Watch what happens in the minutes and hours after you give in.
+        Do you spiral ("the day is ruined, might as well keep going") or
+        recover quickly? What does your self-talk sound like? Notice whether
+        guilt or self-criticism actually makes you more likely to give in
+        again — or less. You're looking for the what-the-hell trigger in
+        your own pattern.
+      daily_prompt: "If you gave in today, what was your first thought afterward? Did it lead to a spiral or a recovery?"
     experiment:
-      text: "STUB — fill in before Week 6."
-      daily_prompt: "STUB"
+      text: >
+        When you slip, practice self-compassion as a deliberate technique:
+        acknowledge what happened without catastrophizing, remind yourself
+        that slips are part of every change process, and ask what you'd say
+        to a close friend in the same situation — then say that to yourself.
+        This isn't self-indulgence; research shows self-compassion produces
+        more accountability and faster recovery than guilt does.
+      daily_prompt: "After a slip or struggle today, did you practice self-compassion? What did you say to yourself — and did it help you get back on track?"
     daily_prompts:
-      - "STUB"
+      - "Did you notice a what-the-hell moment today — one slip leading to more?"
+      - "What was your self-talk after your hardest moment today?"
+      - "Did guilt or self-criticism motivate you today, or did it paralyze you?"
+      - "How did you respond to a slip today — spiral, recover, or something else?"
+      - "What would you say to a close friend who gave in to the same challenge?"
+      - "Did stress today lead to more giving in? How did those two things connect?"
+      - "Looking at the week: what's the difference between holding yourself accountable and shame-spiraling?"
     structured_questions:
       - id: energy_level
         label: "Energy level today"
@@ -200,6 +271,9 @@ weeks:
       - id: urge_count
         label: "How many urges did you notice?"
         type: count_0_10
+      - id: self_compassion_used
+        label: "Did you practice self-compassion after a slip or struggle today?"
+        type: yes_no
 
   - week_number: 7
     title: "Putting the Future on Sale"
