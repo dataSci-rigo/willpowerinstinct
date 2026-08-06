@@ -35,14 +35,6 @@ async def post_init(application: Application) -> None:
     now_local = datetime.now(ZoneInfo(TIMEZONE))
     today = now_local.date()
 
-    # ── Catch-up: advance week if weekly_kickoff was missed ───────────────────
-    started = date.fromisoformat(cycle["started_at"])
-    days_elapsed = (today - started).days
-    expected_week = min(days_elapsed // 7 + 1, 10)
-    if expected_week > cycle["current_week"]:
-        await db.advance_week(cycle["id"], expected_week)
-        logger.info("Catch-up: advanced cycle %d to week %d", cycle["id"], expected_week)
-
     # ── Catch-up: evening check-in if missed AND within the same evening ──────
     # Only send if it's between 9 PM and 11:59 PM — not during daytime restarts.
     if EVENING_HOUR <= now_local.hour <= 23:

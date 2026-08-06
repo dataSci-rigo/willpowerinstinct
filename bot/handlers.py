@@ -440,28 +440,35 @@ async def cmd_today(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     entry = await db.get_daily_entry(cycle["id"])
     urges = await db.get_today_urges(cycle["id"])
     boosters = await db.get_today_boosters(cycle["id"])
+    challenges = await db.get_challenges(cycle["id"])
+    adherences = await db.get_challenge_adherences(cycle["id"])
+    adherence_map = {a["challenge_id"]: a["adherence"] for a in adherences}
     program = load_program()
     week = program.get(cycle["current_week"], {})
 
     today_str = date.today().strftime("%A, %B %d")
-    lines = [
-        f"*{today_str} — Week {cycle['current_week']}: {week.get('title', '')}*\n",
-        f"Challenge: _{cycle['challenge_text']}_",
-        f"I Want: _{cycle['i_want_anchor']}_\n",
-    ]
+    lines = [f"*{today_str} — Week {cycle['current_week']}: {week.get('title', '')}*\n"]
+
+    if challenges:
+        lines.append("*Challenges:*")
+        for c in challenges:
+            adh = adherence_map.get(c["id"])
+            emoji = f" {_adherence_emoji(adh)}" if adh else ""
+            lines.append(f"  {_type_label(c['challenge_type'])}: _{c['challenge_text'][:60]}_{emoji}")
+    lines.append(f"I Want: _{cycle['i_want_anchor']}_\n")
 
     if entry:
         lines.append("*Today's check-in:*")
+        if entry.get("morning_energy"):
+            lines.append(f"  Morning energy: {'⚡' * entry['morning_energy']}")
         if entry.get("energy_level"):
-            lines.append(f"  Energy: {'⚡' * entry['energy_level']}")
-        if entry.get("challenge_adherence"):
-            lines.append(f"  Challenge: {_adherence_emoji(entry['challenge_adherence'])}")
+            lines.append(f"  Evening energy: {'⚡' * entry['energy_level']}")
         if entry.get("microscope_obs"):
             lines.append(f"  Observation: _{entry['microscope_obs']}_")
         if entry.get("reflection_text"):
             lines.append(f"  Reflection: _{entry['reflection_text']}_")
     else:
-        lines.append("_No evening check-in yet today._")
+        lines.append("_No check-in yet today._")
 
     lines.append(f"\n*Urges today:* {len(urges)}")
     if urges:
@@ -515,9 +522,15 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     days_elapsed = (date.today() - started).days
     day_in_week = (days_elapsed % 7) + 1
 
+    challenges = await db.get_challenges(cycle["id"])
+    ch_lines = "\n".join(
+        f"  {_type_label(c['challenge_type'])}: _{c['challenge_text']}_"
+        for c in challenges
+    ) or f"  _{cycle['challenge_text']}_"
+
     await update.message.reply_text(
         f"*Active Cycle*\n"
-        f"Challenge: _{cycle['challenge_text']}_\n"
+        f"*Challenges:*\n{ch_lines}\n"
         f"I Want: _{cycle['i_want_anchor']}_\n\n"
         f"Week {cycle['current_week']} of 10 — Day {day_in_week} of 7\n"
         f"Started: {started.strftime('%B %d, %Y')}",
@@ -639,6 +652,95 @@ async def cmd_history(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     )
 
 
+# ── /review — per-challenge AI review ────────────────────────────────────────
+
+async def cmd_review(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    import asyncio
+    from synthesis import run_challenge_review
+
+    user_id = update.effective_user.id
+    cycle = await db.get_active_cycle(user_id)
+    if not cycle:
+        await _no_cycle(update)
+        return
+
+    challenges = await db.get_challenges(cycle["id"])
+    if not challenges:
+        await update.message.reply_text(
+            "No challenges set up yet. Add challenges at the web panel or use /start."
+        )
+        return
+
+    if len(challenges) == 1:
+        await update.message.reply_text("Generating review… ⏳")
+        text = await run_challenge_review(user_id, cycle, challenges[0])
+        await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN)
+        return
+
+    buttons = [
+        [(f"{_type_label(c['challenge_type'])}: {c['challenge_text'][:50]}",
+          f"review:ch:{c['id']}")]
+        for c in challenges
+    ]
+    await update.message.reply_text(
+        "Which challenge would you like a review on?",
+        reply_markup=_kb(buttons),
+    )
+
+
+async def review_pick_challenge(update: Update,
+                                 context: ContextTypes.DEFAULT_TYPE) -> None:
+    import asyncio
+    from synthesis import run_challenge_review
+
+    query = update.callback_query
+    await query.answer()
+    user_id = update.effective_user.id
+    challenge_id = int(query.data.split(":")[-1])
+
+    cycle = await db.get_active_cycle(user_id)
+    if not cycle:
+        await query.edit_message_text("No active cycle.")
+        return
+
+    challenges = await db.get_challenges(cycle["id"])
+    challenge = next((c for c in challenges if c["id"] == challenge_id), None)
+    if not challenge:
+        await query.edit_message_text("Challenge not found.")
+        return
+
+    await query.edit_message_text("Generating review… ⏳")
+    text = await run_challenge_review(user_id, cycle, challenge)
+    await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN)
+
+
+# ── Morning energy check (scheduler-driven) ──────────────────────────────────
+
+async def _send_morning_energy_prompt(bot, chat_id: int) -> None:
+    kb = _kb([[
+        ("⚡", "morning:energy:1"), ("⚡⚡", "morning:energy:2"),
+        ("⚡⚡⚡", "morning:energy:3"), ("⚡⚡⚡⚡", "morning:energy:4"),
+        ("⚡⚡⚡⚡⚡", "morning:energy:5"),
+    ]])
+    await bot.send_message(
+        chat_id=chat_id,
+        text="Morning energy (1 = depleted, 5 = full)?",
+        reply_markup=kb,
+    )
+
+
+async def morning_energy(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
+    user_id = update.effective_user.id
+    level = int(query.data.split(":")[-1])
+    cycle = await db.get_active_cycle(user_id)
+    if cycle:
+        await db.upsert_daily_entry(user_id, cycle["id"], cycle["current_week"],
+                                    morning_energy=level)
+    await query.edit_message_text(f"Morning energy: {'⚡' * level} — good luck today.")
+
+
 # ── Evening check-in callbacks (scheduler-driven) ────────────────────────────
 # State flows via user_data["checkin"] dict and user_data["awaiting"] for text.
 
@@ -656,36 +758,80 @@ async def _send_energy_prompt(context: ContextTypes.DEFAULT_TYPE,
     )
 
 
+async def _ask_next_challenge_adherence(query, context: ContextTypes.DEFAULT_TYPE) -> None:
+    challenges = context.user_data.get("checkin_challenges", [])
+    idx = context.user_data.get("checkin_ch_idx", 0)
+    ch = challenges[idx]
+    label = _type_label(ch["challenge_type"])
+    text = ch["challenge_text"][:80]
+    kb = _kb([[
+        ("✅ Yes", f"checkin:cha:{ch['id']}:yes"),
+        ("〰️ Partial", f"checkin:cha:{ch['id']}:partial"),
+        ("❌ No", f"checkin:cha:{ch['id']}:no"),
+    ]])
+    await query.edit_message_text(
+        f"*{label}:* _{text}_\n\nHow did you do today?",
+        reply_markup=kb,
+        parse_mode=ParseMode.MARKDOWN,
+    )
+
+
 async def checkin_energy(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     await query.answer()
     user_id = update.effective_user.id
     level = int(query.data.split(":")[-1])
     context.user_data.setdefault("checkin", {})["energy_level"] = level
-    kb = _kb([[
-        ("✅ Yes", "checkin:adherence:yes"),
-        ("〰️ Partial", "checkin:adherence:partial"),
-        ("❌ No", "checkin:adherence:no"),
-    ]])
-    await query.edit_message_text(
-        f"Energy: {'⚡' * level}\n\nDid you honor your challenge today?",
-        reply_markup=kb,
-    )
+
+    cycle = await db.get_active_cycle(user_id)
+    if not cycle:
+        return
+    challenges = await db.get_challenges(cycle["id"])
+    if challenges:
+        context.user_data["checkin_challenges"] = challenges
+        context.user_data["checkin_ch_idx"] = 0
+        context.user_data["checkin_cycle_id"] = cycle["id"]
+        await _ask_next_challenge_adherence(query, context)
+    else:
+        # No challenges yet — go straight to urge count
+        kb = _kb([[
+            ("0", "checkin:urges:0"), ("1", "checkin:urges:1"),
+            ("2", "checkin:urges:2"), ("3", "checkin:urges:3"),
+            ("4", "checkin:urges:4"), ("5+", "checkin:urges:5"),
+        ]])
+        await query.edit_message_text(
+            f"Energy: {'⚡' * level}\n\nHow many urges did you notice today?",
+            reply_markup=kb,
+        )
 
 
-async def checkin_adherence(update: Update,
-                            context: ContextTypes.DEFAULT_TYPE) -> None:
+async def checkin_challenge_adherence(update: Update,
+                                       context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     await query.answer()
     user_id = update.effective_user.id
-    val = query.data.split(":")[-1]
-    context.user_data.setdefault("checkin", {})["challenge_adherence"] = val
-    kb = _kb([[
-        ("0", "checkin:urges:0"), ("1", "checkin:urges:1"),
-        ("2", "checkin:urges:2"), ("3", "checkin:urges:3"),
-        ("4", "checkin:urges:4"), ("5+", "checkin:urges:5"),
-    ]])
-    await query.edit_message_text("How many urges did you notice today?", reply_markup=kb)
+    parts = query.data.split(":")  # checkin:cha:<id>:<adherence>
+    challenge_id = int(parts[2])
+    adherence = parts[3]
+
+    cycle_id = context.user_data.get("checkin_cycle_id")
+    if cycle_id:
+        await db.log_challenge_adherence(user_id, cycle_id, challenge_id, adherence)
+
+    context.user_data["checkin_ch_idx"] = context.user_data.get("checkin_ch_idx", 0) + 1
+    challenges = context.user_data.get("checkin_challenges", [])
+    idx = context.user_data["checkin_ch_idx"]
+
+    if idx < len(challenges):
+        await _ask_next_challenge_adherence(query, context)
+    else:
+        # All challenges done — move to urge count
+        kb = _kb([[
+            ("0", "checkin:urges:0"), ("1", "checkin:urges:1"),
+            ("2", "checkin:urges:2"), ("3", "checkin:urges:3"),
+            ("4", "checkin:urges:4"), ("5+", "checkin:urges:5"),
+        ]])
+        await query.edit_message_text("How many urges did you notice today?", reply_markup=kb)
 
 
 async def checkin_urges(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -842,10 +988,13 @@ async def _ask_observation_msg(update: Update, context: ContextTypes.DEFAULT_TYP
 async def _save_checkin(update: Update, context: ContextTypes.DEFAULT_TYPE,
                          user_id: int, cycle: dict) -> None:
     data = context.user_data.pop("checkin", {})
+    context.user_data.pop("checkin_challenges", None)
+    context.user_data.pop("checkin_ch_idx", None)
+    context.user_data.pop("checkin_cycle_id", None)
     week_num = cycle["current_week"]
 
     entry_fields = {k: v for k, v in data.items()
-                    if k in ("energy_level", "challenge_adherence", "urge_count",
+                    if k in ("energy_level", "urge_count",
                              "microscope_obs", "reflection_text")}
     booster_fields = {k: v for k, v in data.items()
                       if k in ("sleep_hours", "exercise_done",
@@ -934,6 +1083,7 @@ _HELP_TEXT = """\
 /week — This week's theme, microscope exercise & experiment
 /tips — AI-generated tips for the current week
 /history [N] — Show Week N synthesis (default: current week)
+/review — AI review of a specific challenge's data
 
 *Info*
 /status — Cycle overview (week, day, challenge)
@@ -997,14 +1147,21 @@ def register_handlers(app) -> None:
     app.add_handler(CommandHandler("status",  cmd_status))
     app.add_handler(CommandHandler("history", cmd_history))
     app.add_handler(CommandHandler("setweek", cmd_setweek))
+    app.add_handler(CommandHandler("review",  cmd_review))
     app.add_handler(CommandHandler("help",    cmd_help))
 
+    # Morning energy
+    app.add_handler(CallbackQueryHandler(morning_energy,             pattern=r"^morning:energy:"))
+
     # Evening check-in callbacks
-    app.add_handler(CallbackQueryHandler(checkin_energy,    pattern=r"^checkin:energy:"))
-    app.add_handler(CallbackQueryHandler(checkin_adherence, pattern=r"^checkin:adherence:"))
-    app.add_handler(CallbackQueryHandler(checkin_urges,     pattern=r"^checkin:urges:"))
-    app.add_handler(CallbackQueryHandler(checkin_breathing, pattern=r"^checkin:breathing:"))
-    app.add_handler(CallbackQueryHandler(checkin_exercise,  pattern=r"^checkin:exercise:"))
+    app.add_handler(CallbackQueryHandler(checkin_energy,             pattern=r"^checkin:energy:"))
+    app.add_handler(CallbackQueryHandler(checkin_challenge_adherence,pattern=r"^checkin:cha:"))
+    app.add_handler(CallbackQueryHandler(checkin_urges,              pattern=r"^checkin:urges:"))
+    app.add_handler(CallbackQueryHandler(checkin_breathing,          pattern=r"^checkin:breathing:"))
+    app.add_handler(CallbackQueryHandler(checkin_exercise,           pattern=r"^checkin:exercise:"))
+
+    # Review pick
+    app.add_handler(CallbackQueryHandler(review_pick_challenge,      pattern=r"^review:ch:"))
 
     # Free-text replies for check-in and reflection (lower priority — runs after convs)
     app.add_handler(

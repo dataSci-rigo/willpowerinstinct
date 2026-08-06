@@ -75,6 +75,16 @@ CREATE TABLE IF NOT EXISTS weekly_syntheses (
     input_summary        TEXT,
     UNIQUE(cycle_id, week_number)
 );
+
+CREATE TABLE IF NOT EXISTS challenge_adherence_log (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id      INTEGER NOT NULL,
+    cycle_id     INTEGER NOT NULL,
+    date         TEXT    NOT NULL,
+    challenge_id INTEGER NOT NULL,
+    adherence    TEXT    NOT NULL,   -- yes | partial | no
+    UNIQUE(cycle_id, date, challenge_id)
+);
 """
 
 
@@ -88,6 +98,7 @@ async def init_db() -> None:
             "ALTER TABLE urges ADD COLUMN i_want_recalled INTEGER",
             "ALTER TABLE urges ADD COLUMN breathing_done INTEGER",
             "ALTER TABLE urges ADD COLUMN recovery_action TEXT",
+            "ALTER TABLE daily_entries ADD COLUMN morning_energy INTEGER",
         ]:
             try:
                 await db.execute(sql)
@@ -106,8 +117,15 @@ async def create_cycle(user_id: int, challenge_type: str, challenge_text: str,
             "VALUES (?, ?, ?, ?, ?)",
             (user_id, date.today().isoformat(), challenge_type, challenge_text, i_want_anchor),
         )
+        cycle_id = cur.lastrowid
+        # Mirror initial challenge into challenges table so all code uses one source
+        await db.execute(
+            "INSERT INTO challenges (user_id, cycle_id, challenge_type, challenge_text, sort_order) "
+            "VALUES (?, ?, ?, ?, 0)",
+            (user_id, cycle_id, challenge_type, challenge_text),
+        )
         await db.commit()
-        return cur.lastrowid
+        return cycle_id
 
 
 async def get_active_cycles(user_id: int) -> list[dict]:
@@ -352,3 +370,55 @@ async def get_synthesis(cycle_id: int, week_number: int) -> Optional[dict]:
         ) as cur:
             row = await cur.fetchone()
             return dict(row) if row else None
+
+
+# ── challenge adherence log ───────────────────────────────────────────────────
+
+async def log_challenge_adherence(user_id: int, cycle_id: int,
+                                   challenge_id: int, adherence: str) -> None:
+    today = date.today().isoformat()
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "INSERT INTO challenge_adherence_log (user_id, cycle_id, date, challenge_id, adherence) "
+            "VALUES (?, ?, ?, ?, ?) "
+            "ON CONFLICT(cycle_id, date, challenge_id) DO UPDATE SET adherence=excluded.adherence",
+            (user_id, cycle_id, today, challenge_id, adherence),
+        )
+        await db.commit()
+
+
+async def get_challenge_adherences(cycle_id: int,
+                                    for_date: Optional[str] = None) -> list[dict]:
+    target = for_date or date.today().isoformat()
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT cal.*, c.challenge_text, c.challenge_type "
+            "FROM challenge_adherence_log cal "
+            "JOIN challenges c ON c.id = cal.challenge_id "
+            "WHERE cal.cycle_id=? AND cal.date=? ORDER BY c.sort_order, c.id",
+            (cycle_id, target),
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def get_challenge_adherences_all(cycle_id: int,
+                                        challenge_id: int) -> list[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM challenge_adherence_log "
+            "WHERE cycle_id=? AND challenge_id=? ORDER BY date",
+            (cycle_id, challenge_id),
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def get_challenge_urges(cycle_id: int, challenge_id: int) -> list[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM urges WHERE cycle_id=? AND challenge_id=? ORDER BY timestamp",
+            (cycle_id, challenge_id),
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]

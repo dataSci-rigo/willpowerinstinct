@@ -17,7 +17,7 @@ from telegram.ext import ContextTypes
 
 import db
 from config import MORNING_HOUR, EVENING_HOUR, OWNER_CHAT_ID, load_program
-from handlers import _send_energy_prompt
+from handlers import _send_energy_prompt, _send_morning_energy_prompt
 from synthesis import run_weekly_synthesis
 
 logger = logging.getLogger(__name__)
@@ -52,6 +52,7 @@ async def morning_nudge(context: ContextTypes.DEFAULT_TYPE) -> None:
         text="\n".join(lines),
         parse_mode=ParseMode.MARKDOWN,
     )
+    await _send_morning_energy_prompt(context.bot, user_id)
     logger.info("Morning nudge sent to %d", user_id)
 
 

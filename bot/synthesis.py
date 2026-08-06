@@ -115,3 +115,59 @@ async def run_weekly_synthesis(user_id: int, cycle: dict) -> str:
 
     await db.save_synthesis(user_id, cycle["id"], week_num, response_text, input_summary)
     return response_text
+
+
+async def run_challenge_review(user_id: int, cycle: dict, challenge: dict) -> str:
+    """Generate an on-demand AI review for a single challenge. Not stored."""
+    import asyncio
+
+    urges = await db.get_challenge_urges(cycle["id"], challenge["id"])
+    adherences = await db.get_challenge_adherences_all(cycle["id"], challenge["id"])
+
+    def _fmt_urge(u: dict) -> str:
+        outcome = u.get("outcome") or ("gave in" if u.get("gave_in") else "resisted")
+        parts = [outcome, f"intensity={u.get('intensity','?')}/5"]
+        if u.get("trigger_text"):
+            parts.append(f"trigger: {u['trigger_text']}")
+        if u.get("notes"):
+            parts.append(f"notes: {u['notes']}")
+        skill = u.get("skill_week")
+        if skill:
+            parts.append(f"skill-week={skill}")
+        return f"  {u['timestamp'][:10]}: " + " | ".join(parts)
+
+    def _fmt_adh(a: dict) -> str:
+        return f"  {a['date']}: {a['adherence']}"
+
+    urge_text = "\n".join(_fmt_urge(u) for u in urges) or "  No urges logged for this challenge."
+    adh_text = "\n".join(_fmt_adh(a) for a in adherences) or "  No daily check-in data yet."
+
+    ch_type = {"i_will": "I Will", "i_wont": "I Won't", "i_want": "I Want"}.get(
+        challenge["challenge_type"], challenge["challenge_type"]
+    )
+
+    system_prompt = (
+        "You are a concise, non-judgmental coach working through Kelly McGonigal's "
+        "Willpower Instinct program. Review the data for a single challenge and give "
+        "specific, actionable feedback. Cite the actual data. Under 300 words."
+    )
+    user_message = (
+        f"Challenge type: {ch_type}\n"
+        f"Challenge: {challenge['challenge_text']}\n"
+        f"I Want anchor: {cycle['i_want_anchor']}\n"
+        f"Current week: {cycle['current_week']}\n\n"
+        f"Daily adherence log:\n{adh_text}\n\n"
+        f"Urge/temptation log:\n{urge_text}\n\n"
+        "What patterns do you see? What's working, what isn't? "
+        "What one thing should I focus on going forward?"
+    )
+
+    logger.info("Calling Claude for challenge review (challenge %d)", challenge["id"])
+    response = await asyncio.to_thread(
+        _client.messages.create,
+        model=SYNTHESIS_MODEL,
+        max_tokens=500,
+        system=system_prompt,
+        messages=[{"role": "user", "content": user_message}],
+    )
+    return f"*Review: {challenge['challenge_text'][:60]}*\n\n{response.content[0].text}"
